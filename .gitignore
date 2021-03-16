@@ -1,0 +1,23 @@
+# Python [Byte-compiled, Optimized, DLL]
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary Microsoft Office Files
+~$*.doc*
+~$*.xls*
+
+# Miscellaneous Log Files
+*.log
+
+# Potential CI Logs
+_ci_reports
+.coverage
+.cache
+
+# Ignore IDE files
+.idea
+flycheck*.py
+
+# VS Code
+.vscode

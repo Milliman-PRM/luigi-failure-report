@@ -185,7 +185,7 @@ def send_email(
 
     # Send the message via local SMTP server.
     smtp = smtplib.SMTP("smtp.milliman.com")
-    smtp.sendmail(from_addr, to_addr, msg.as_string())
+    smtp.sendmail(from_addr, cc_list, msg.as_string())
     smtp.quit()
 
 

@@ -26,9 +26,7 @@ def query_task_history(
     user: str = os.environ["username"], host: str = "10.3.200.99", port: str = "5432"
 ) -> typing.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Query the task history into pandas dataframes"""
-    with psycopg2.connect(
-        database="luigi", user=os.environ["username"], host=host, port=port
-    ) as conn:
+    with psycopg2.connect(database="luigi", user=user, host=host, port=port) as conn:
         task_events = pd.read_sql("select * from public.task_events", conn)
         task_parms = pd.read_sql("select * from public.task_parameters", conn)
         tasks = pd.read_sql("select * from public.tasks", conn).set_index("id")

@@ -10,6 +10,7 @@
 import datetime
 import logging
 import os
+import pprint
 import smtplib
 import typing
 from email.mime.multipart import MIMEMultipart
@@ -38,23 +39,22 @@ def create_master_task_history(
     task_events: pd.DataFrame,
     task_parms: pd.DataFrame,
     tasks: pd.DataFrame,
-    date_cutoff: typing.Optional[datetime.date] = None,
+    date_start: typing.Optional[datetime.date] = None,
+    date_end: typing.Optional[datetime.date] = None,
     client_id_prefixes: typing.Optional[typing.Iterable[str]] = None,
 ) -> pd.DataFrame:
     """Merge all available task information together and limit to applicable tasks"""
-    if date_cutoff:
-        task_events_since_date = task_events.loc[
-            lambda df: df.ts >= pd.Timestamp(date_cutoff)
-        ]
-    else:
-        task_events_since_date = task_events
+    if date_start:
+        task_events = task_events.loc[lambda df: df.ts >= pd.Timestamp(date_start)]
+    if date_end:
+        task_events = task_events.loc[lambda df: df.ts <= pd.Timestamp(date_end)]
 
     task_parms_wide = task_parms.loc[lambda df: df.name == "pipeline_signature"].pivot(
         index="task_id", columns="name", values="value"
     )
 
     task_master = (
-        task_events_since_date.join(task_parms_wide, on="task_id")
+        task_events.join(task_parms_wide, on="task_id")
         .join(tasks.rename({"task_id": "task_name"}, axis="columns"), on="task_id")
         .assign(
             hour=lambda df: df.ts.dt.hour,
@@ -84,6 +84,7 @@ def summarize_failure_rate(
     do_print: bool = True,
     n_min_runs_to_print: int = 10,
 ) -> pd.DataFrame:
+    """Summarize failure rate at the requested summary level"""
     if "event_name" in levels:
         raise ValueError("Can not summarize event_name")
 
@@ -112,19 +113,38 @@ def summarize_failure_rate(
 
 def format_email(
     map_failure_rates: typing.Mapping[str, pd.DataFrame],
-    date_cutoff: datetime.date,
+    date_start: typing.Optional[datetime.date] = None,
+    date_end: typing.Optional[datetime.date] = None,
     client_id_prefixes: typing.Optional[typing.Iterable[str]] = None,
 ) -> str:
     """Get formatted email contents"""
 
-    email_subject = f"Luigi failure report since {date_cutoff}"
+    run_parms_w_nulls = {
+        "date_start": date_start,
+        "date_end": date_end,
+        "client_id_prefixes": client_id_prefixes,
+    }
+    run_parms = {k: str(v) for k, v in run_parms_w_nulls.items() if v is not None}
+    email_subject = f"Luigi failure report"
+    try:
+        email_subject += f" from {run_parms['date_start']}"
+    except KeyError:
+        pass
 
-    email_sections = [
-        f"<h2>Luigi failure rate report for tasks since {date_cutoff}</h2>"
-    ]
-    if client_id_prefixes:
+    try:
+        email_subject += f" thru {run_parms['date_end']}"
+    except KeyError:
+        pass
+
+    try:
+        email_subject += f" for {run_parms['client_id_prefixes']}"
+    except KeyError:
+        pass
+
+    email_sections = [f"<h2>Luigi failure rate report for indy-luigi.milliman.com</h2>"]
+    if run_parms:
         email_sections.append(
-            f"<p>Limited to client codes beginning with {client_id_prefixes}</p>"
+            f"<p>Parameters:\n{pprint.pformat(run_parms)}</p>".replace("\n", "<br />")
         )
 
     table_summaries_html = []
@@ -172,17 +192,20 @@ def send_email(
 
 
 def main(
-    date_cutoff: typing.Optional[datetime.date] = None,
+    date_start: typing.Optional[datetime.date] = None,
+    date_end: typing.Optional[datetime.date] = None,
     client_id_prefixes: typing.Optional[typing.Iterable[str]] = None,
     cc_list: typing.Optional[typing.Iterable[str]] = None,
 ) -> int:
+    """Main execution of logic"""
     task_events, task_parms, tasks = query_task_history()
 
     task_master = create_master_task_history(
         task_events,
         task_parms,
         tasks,
-        date_cutoff=date_cutoff,
+        date_start=date_start,
+        date_end=date_end,
         client_id_prefixes=client_id_prefixes,
     )
 
@@ -207,7 +230,7 @@ def main(
 
     if cc_list:
         email_subject, email_body = format_email(
-            map_failure_rates, date_cutoff, client_id_prefixes
+            map_failure_rates, date_start, date_end, client_id_prefixes
         )
         send_email(email_subject, email_body, cc_list)
 
@@ -231,17 +254,28 @@ if __name__ == "__main__":
         default=None,
     )
     ARGPARSER.add_argument(
-        "-d",
-        "--date_cutoff",
+        "-s",
+        "--date_start",
         help="ISO format. Ignore tasks that are earlier than this date cutoff",
+        default=None,
+    )
+    ARGPARSER.add_argument(
+        "-e",
+        "--date_end",
+        help="ISO format. Ignore tasks that are later than this date cutoff",
         default=None,
     )
     ARGS = ARGPARSER.parse_args()
 
-    if ARGS.date_cutoff:
-        DATE_CUTOFF = datetime.date.fromisoformat(ARGS.date_cutoff)
+    if ARGS.date_start:
+        DATE_START = datetime.date.fromisoformat(ARGS.date_start)
     else:
-        DATE_CUTOFF = None
+        DATE_START = None
+
+    if ARGS.date_end:
+        DATE_END = datetime.date.fromisoformat(ARGS.date_end)
+    else:
+        DATE_END = None
 
     try:
         CLIENT_PREFIXES = ARGS.prefixes.split("~")
@@ -253,5 +287,5 @@ if __name__ == "__main__":
     except AttributeError:
         CC_LIST = None
 
-    RETURN_CODE = main(DATE_CUTOFF, CLIENT_PREFIXES, CC_LIST)
+    RETURN_CODE = main(DATE_START, DATE_END, CLIENT_PREFIXES, CC_LIST)
     sys.exit(RETURN_CODE)

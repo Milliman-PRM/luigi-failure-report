@@ -26,7 +26,11 @@ def query_task_history(
     user: str = os.environ["username"], host: str = "10.3.200.99", port: str = "5432"
 ) -> typing.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Query the task history into pandas dataframes"""
-    with psycopg2.connect(database="luigi", user=user, host=host, port=port) as conn:
+    connection_parms = {"database": "luigi", "user": user, "host": host, "port": port}
+    LOGGER.info(
+        "Attempting to connect to database with parameters: %s", connection_parms
+    )
+    with psycopg2.connect(**connection_parms) as conn:
         task_events = pd.read_sql("select * from public.task_events", conn)
         task_parms = pd.read_sql("select * from public.task_parameters", conn)
         tasks = pd.read_sql("select * from public.tasks", conn).set_index("id")
@@ -238,6 +242,17 @@ def main(
 if __name__ == "__main__":
     import argparse
     import sys
+
+    _LOG_LEVEL = logging.INFO
+    _ROOT_LOGGER = logging.getLogger()
+
+    _HANDLER = logging.StreamHandler(sys.stdout)
+    _HANDLER.setLevel(_LOG_LEVEL)
+    _HANDLER.setFormatter(
+        logging.Formatter("%(asctime)s|%(name)s|%(levelname)s|%(message)s")
+    )
+    _ROOT_LOGGER.addHandler(_HANDLER)
+    _ROOT_LOGGER.setLevel(_LOG_LEVEL)
 
     ARGPARSER = argparse.ArgumentParser(
         description="Execute a Luigi task history summary"

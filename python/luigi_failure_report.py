@@ -244,15 +244,14 @@ if __name__ == "__main__":
     import sys
 
     _LOG_LEVEL = logging.INFO
-    _ROOT_LOGGER = logging.getLogger()
 
     _HANDLER = logging.StreamHandler(sys.stdout)
     _HANDLER.setLevel(_LOG_LEVEL)
     _HANDLER.setFormatter(
         logging.Formatter("%(asctime)s|%(name)s|%(levelname)s|%(message)s")
     )
-    _ROOT_LOGGER.addHandler(_HANDLER)
-    _ROOT_LOGGER.setLevel(_LOG_LEVEL)
+    LOGGER.addHandler(_HANDLER)
+    LOGGER.setLevel(_LOG_LEVEL)
 
     ARGPARSER = argparse.ArgumentParser(
         description="Execute a Luigi task history summary"

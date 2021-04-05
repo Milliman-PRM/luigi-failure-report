@@ -2,7 +2,7 @@
 ### CODE OWNERS: Ben Copeland, Daniel Buis
 
 ### OBJECTIVE:
-    Loop through a set of statuc client ID prefixes and CC list with dynamic dates
+    Loop through a set of static client ID prefixes and CC list with dynamic dates
 
 ### DEVELOPER NOTES:
     Requires read access to the Luigi task history database

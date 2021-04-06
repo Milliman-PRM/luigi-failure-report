@@ -5,7 +5,8 @@
   Parse log files and get some high level information about the different errors and exceptions that occured.
 
 ### DEVELOPER NOTES:
-  This is intended to be run locally, populating the WORKSPACES iterable with whatever space(s) you are looking at
+  This is intended to be run locally, populating the WORKSPACES iterable with whatever space(s) you are looking at.
+  Spark errors should be taken with a grain of salt as there are often non-fatal errors in the logs.
 """
 import logging
 import os
@@ -32,10 +33,72 @@ red_herring_errors = [
     "root|INFO|Exception while sending command",
 ]
 
+error_message_map = {
+    "Connection refused: no further information": "Connection refused",
+    "connection was forcibly closed": "Connection closed",
+    "Connection reset": "Connection reset",
+    "Failed to connect": "Connection failed",
+    "ConnectionResetError": "Connection reset error",
+    "Exception in connection from /": "Connection Exception",
+    "OutOfMemoryError": "Out of memory",
+    "There is not enough space on the disk": "Out of memory",
+    "TimeoutException": "Timeout error",
+    "Error while sending": "Error while sending",
+    "Error while receiving": "Error while receiving",
+    "FetchFailed": "Fetch failure while reading to or from disk",
+    "fetch": "Fetch failure while reading to or from disk",
+    "PermissionError": "Permissions error",
+    "Python worker failed to connect back": "Lost worker connection",
+    "Python worker exited unexpectedly (crashed)": "Python worker crashed",
+    "Caused by: java.io.EOFException": "End of file exception",
+    "UncaughtExceptions": "Uncaught exception",
+}
 
 # =============================================================================
 # LIBRARIES, LOCATIONS, LITERALS, ETC. GO ABOVE HERE
 # =============================================================================
+
+
+def collect_logfiles():
+    logfile_list = []
+    for workspace in WORKSPACES:
+        for (dirpath, dirnames, filenames) in os.walk(workspace / "02_Logs"):
+            for f in filenames:
+                file_path = Path(os.path.join(dirpath, f))
+                if file_path.suffix == ".log":
+                    logfile_list += [file_path]
+
+    return logfile_list
+
+
+def parse_log_file(file_path):
+    with open(file_path) as file:
+        spark_log_path = None
+        for line in file:
+            if "Redirecting Spark logging to S" in line:
+                spark_log_path = line.split(" ")[-1].replace("\n", "")
+            if any(x in line.lower() for x in error_indicators):
+                if not any(y in line for y in red_herring_errors):
+                    return (line, str(file_path), spark_log_path)
+
+
+def determine_spark_error(file_path):
+    errors = []
+    with open(file_path) as file:
+        for line in file:
+            if any(x in line.lower() for x in error_indicators):
+                if not any(y in line for y in red_herring_errors):
+                    errors += [line]
+    last_error = errors[-1]
+    error_description = None
+    for key in error_message_map.keys():
+        if key in last_error.lower():
+            error_description = error_message_map[key]
+
+    if error_description is None:
+        error_description = "Miscellaneous error"
+
+    return (last_error, error_description, file_path)
 
 
 def main() -> int:
@@ -45,90 +108,38 @@ def main() -> int:
 
     error_collection = []
 
-    for workspace in WORKSPACES:
-        for (dirpath, dirnames, filenames) in os.walk(workspace / "02_Logs"):
-            for f in filenames:
-                file_path = Path(os.path.join(dirpath, f))
-                if file_path.suffix == ".txt" or file_path.suffix == ".log":
-                    with open(file_path) as file:
-                        for line in file:
-                            if any(x in line.lower() for x in error_indicators):
-                                if not any(y in line for y in red_herring_errors):
-                                    error_collection += [
-                                        (line, str(file_path), file_path.suffix)
-                                    ]
+    log_file_list = collect_logfiles()
 
-    col_names = ["error message", "file path", "file extension"]
-    error_df = sparkapp.session.createDataFrame(error_collection, col_names)
+    for log in log_file_list:
+        log_tuple = parse_log_file(log)
+        if log_tuple:
+            error_collection += [log_tuple]
 
-    error_df = error_df.withColumn(
-        "error category",
-        F.when(
-            F.col("error message").contains(
-                "Connection refused: no further information"
-            ),
-            "Connection Refused",
-        )
-        .when(
-            F.col("error message").contains(
-                "An existing connection was forcibly closed by the remote host"
-            ),
-            "Connection closed",
-        )
-        .when(F.col("error message").contains("Connection reset"), "Connection reset")
-        .when(F.col("error message").contains("Failed to connect"), "Connection failed")
-        .when(
-            F.col("error message").contains("ConnectionResetError"),
-            "Connection reset error",
-        )
-        .when(
-            F.col("error message").contains("Exception in connection from /"),
-            "Connection exception",
-        )
-        .when(
-            (F.col("error message").contains("OutOfMemoryError"))
-            | (
-                F.col("error message").contains("There is not enough space on the disk")
-            ),
-            "Out of memory",
-        )
-        .when(F.col("error message").contains("TimeoutException"), "Timeout error")
-        .when(
-            F.col("error message").contains("Error while sending"),
-            "Error while sending",
-        )
-        .when(
-            F.col("error message").contains("Error while receiving"),
-            "Error while receiving",
-        )
-        .when(
-            (F.col("error message").contains("FetchFailed"))
-            | F.col("error message").contains("fetch"),
-            "Fetch failure while reading to or from disk",
-        )
-        .when(F.col("error message").contains("PermissionError"), "Permission error")
-        .when(
-            F.col("error message").contains("Python worker failed to connect back"),
-            "Lost worker connection",
-        )
-        .when(
-            F.col("error message").contains(
-                "Python worker exited unexpectedly (crashed)"
-            ),
-            "Python worker crashed",
-        )
-        .when(
-            F.col("error message").contains("Caused by: java.io.EOFException"),
-            "End of file error",
-        )
-        .when(
-            F.col("error message").contains("UncaughtExceptions"),
-            "Generic uncaught spark exception",
-        )
-        .otherwise("Miscellaneous"),
-    ).withColumn(
-        "log type",
-        F.when(F.col("file extension") == ".log", "Script log").otherwise("Spark log"),
+    log_df_col_names = ["error message", "file path", "spark logfile"]
+    log_error_df = sparkapp.session.createDataFrame(error_collection, log_df_col_names)
+
+    spark_error_collection = []
+    for error in error_collection:
+        if error[-1] is not None:
+            spark_error_collection += [determine_spark_error(error[-1])]
+
+    spark_df_col_names = [
+        "spark error message",
+        "spark error description",
+        "spark logfile",
+    ]
+    spark_error_df = sparkapp.session.createDataFrame(
+        spark_error_collection, spark_df_col_names
+    )
+
+    error_summary_df = log_error_df.join(
+        spark_error_df, "spark logfile", "left_outer"
+    ).select(
+        F.col("error message").alias("script error message"),
+        F.col("spark error message"),
+        F.col("spark error description"),
+        F.col("file path").alias("script log path"),
+        F.col("spark logfile"),
     )
 
     return 0

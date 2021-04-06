@@ -21,7 +21,23 @@ LOGGER = logging.getLogger(__name__)
 PRM_META = prm.meta.project.parse_project_metadata()
 
 WORKSPACES = [Path(r"S:\PHI\0273WSP\WSP_MSSP_2021\xx-dev\test_switch_dell")]
-error_indicators = ["exception", "error"]
+error_indicators = [
+    "exception",
+    "error",
+    "INFO:",
+    "WARNING:",
+    "NOTE: Variable",
+    "NOTE: Invalid",
+    "NOTE: Library",
+    "NOTE: MERGE Statement",
+    "NOTE: A hardware",
+    "NOTE: Character",
+    "NOTE: Missing",
+    "NOTE: Division",
+    "NOTE: Mathematical",
+    "NOTE: Interact",
+    "NOTE: SAS set option OBS=0",
+]
 red_herring_errors = [
     "Not validating SparkApp cache due to prior exception",
     "failed with return code",

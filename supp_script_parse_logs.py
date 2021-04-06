@@ -76,6 +76,7 @@ error_message_map = {
 
 
 def collect_logfiles():
+    """Compiles a list of log files"""
     logfile_list = []
     for workspace in WORKSPACES:
         for (dirpath, dirnames, filenames) in os.walk(workspace / "02_Logs"):
@@ -88,6 +89,7 @@ def collect_logfiles():
 
 
 def parse_log_file(file_path):
+    """Parse the given log file and return a tupleized summary"""
     with open(file_path) as file:
         spark_log_path = None
         for line in file:
@@ -99,6 +101,7 @@ def parse_log_file(file_path):
 
 
 def determine_spark_error(file_path):
+    """Parse the given log file and return a tupleized summary"""
     errors = []
     with open(file_path) as file:
         for line in file:
@@ -131,7 +134,7 @@ def main() -> int:
         if log_tuple:
             error_collection += [log_tuple]
 
-    log_df_col_names = ["error message", "file path", "spark logfile"]
+    log_df_col_names = ["script error message", "script file path", "spark logfile"]
     log_error_df = sparkapp.session.createDataFrame(error_collection, log_df_col_names)
 
     spark_error_collection = []
@@ -151,10 +154,10 @@ def main() -> int:
     error_summary_df = log_error_df.join(
         spark_error_df, "spark logfile", "left_outer"
     ).select(
-        F.col("error message").alias("script error message"),
+        F.col("script error message"),
         F.col("spark error message"),
         F.col("spark error description"),
-        F.col("file path").alias("script log path"),
+        F.col("script file path"),
         F.col("spark logfile"),
     )
 

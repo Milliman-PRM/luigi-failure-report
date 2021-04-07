@@ -20,10 +20,11 @@ import pandas as pd
 import psycopg2
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_USER = "Indy_Jenkins_Luigi_DB"
 
 
 def query_task_history(
-    user: str = os.environ["username"], host: str = "10.3.200.99", port: str = "5432"
+    user: str = DEFAULT_USER, host: str = "10.3.200.99", port: str = "5432"
 ) -> typing.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Query the task history into pandas dataframes"""
     connection_parms = {"database": "luigi", "user": user, "host": host, "port": port}
@@ -194,13 +195,14 @@ def send_email(
 
 
 def main(
+    user: str,
     date_start: typing.Optional[datetime.date] = None,
     date_end: typing.Optional[datetime.date] = None,
     client_id_prefixes: typing.Optional[typing.Iterable[str]] = None,
     cc_list: typing.Optional[typing.Iterable[str]] = None,
 ) -> int:
     """Main execution of logic"""
-    task_events, task_parms, tasks = query_task_history()
+    task_events, task_parms, tasks = query_task_history(user)
 
     task_master = create_master_task_history(
         task_events,
@@ -277,6 +279,13 @@ if __name__ == "__main__":
         help="ISO format. Ignore tasks that are later than this date cutoff",
         default=None,
     )
+    ARGPARSER.add_argument(
+        "-u",
+        "--user",
+        help="Username for database authentication. Should be Milliman user name",
+        default=DEFAULT_USER,
+    )
+    DEFAULT_USER
     ARGS = ARGPARSER.parse_args()
 
     if ARGS.date_start:
@@ -299,5 +308,5 @@ if __name__ == "__main__":
     except AttributeError:
         CC_LIST = None
 
-    RETURN_CODE = main(DATE_START, DATE_END, CLIENT_PREFIXES, CC_LIST)
+    RETURN_CODE = main(ARGS.user, DATE_START, DATE_END, CLIENT_PREFIXES, CC_LIST)
     sys.exit(RETURN_CODE)

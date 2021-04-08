@@ -1,5 +1,5 @@
 """
-### CODE OWNERS: Dan Buis
+### CODE OWNERS: Dan Buis, Ben Copeland
 
 ### OBJECTIVE:
   Parse log files and get some high level information about the different errors and exceptions that occured.

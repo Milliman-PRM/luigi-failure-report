@@ -20,7 +20,7 @@ import pandas as pd
 import psycopg2
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_USER = "Indy_Jenkins_Luigi_DB"
+DEFAULT_USER = "indy_jenkins_luigi_db"
 
 
 def query_task_history(

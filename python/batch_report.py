@@ -39,6 +39,7 @@ def main() -> int:
 
     for param in BATCH_PARAMS:
         luigi_failure_report.main(
+            user=luigi_failure_report.DEFAULT_USER,
             date_start=quarter_start,
             date_end=quarter_end,
             client_id_prefixes=param[0],

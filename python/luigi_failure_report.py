@@ -24,16 +24,12 @@ DEFAULT_USER = "Indy_Jenkins_Luigi"
 
 
 def query_task_history(
-    user: str = DEFAULT_USER, host: str = "10.3.200.99", port: str = "5432"
+    user: str = DEFAULT_USER,
+    host: str = "indy-pgsql01.milliman.com",
+    port: str = "5432",
 ) -> typing.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Query the task history into pandas dataframes"""
-    connection_parms = {
-        "database": "luigi",
-        "user": user,
-        "host": host,
-        "port": port,
-        "sslmode": "require",
-    }
+    connection_parms = {"database": "luigi", "user": user, "host": host, "port": port}
     LOGGER.info(
         "Attempting to connect to database with parameters: %s", connection_parms
     )

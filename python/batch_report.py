@@ -17,7 +17,7 @@ LOGGER = logging.getLogger(__name__)
 
 BATCH_PARAMS = [
     (["0273", "1111"], ["ben.copeland@milliman.com", "daniel.buis@milliman.com", "shea.parkes@milliman.com", "holly.moore@milliman.com"]),
-    (["1111", "1112", "1113"], ["kate.fitch@milliman.com", "jonah.broulette@milliman.com", "michele.berrios@milliman.com", "pierre.cornell@milliman.com"]),
+    (["1111", "1112", "1113"], ["kate.fitch@milliman.com", "michele.berrios@milliman.com", "pierre.cornell@milliman.com", "jonah.broulette@milliman.com", "shea.parkes@milliman.com"]),
     # (["0273WSP"], ["ben.copeland@milliman.com", "daniel.buis@milliman.com"]),
     # (['1111'], 'pierre.cornell@milliman.com~umang.gupta@milliman.com')
 ]

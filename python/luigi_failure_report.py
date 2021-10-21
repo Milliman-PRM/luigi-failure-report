@@ -20,16 +20,27 @@ import pandas as pd
 import psycopg2
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_USER = "indy_jenkins_luigi"
+DEFAULT_HOST = os.environ.get(
+    "HOSTNAME_LUIGI_HISTORY_SERVER", "az-pgsql01.postgres.database.azure.com"
+)
+DEFAULT_USER = os.environ.get("USER_LUIGI_HISTORY", "indy_jenkins_luigi")
+DEFAULT_PASSWORD = os.environ.get("TOKEN_LUIGI_HISTORY", "indy_jenkins_luigi")
 
 
 def query_task_history(
-    user: str = DEFAULT_USER,
-    host: str = "indy-pgsql01.milliman.com",
+    host: str = DEFAULT_HOST,
     port: str = "5432",
+    user: str = DEFAULT_USER,
+    password: str = DEFAULT_PASSWORD,
 ) -> typing.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Query the task history into pandas dataframes"""
-    connection_parms = {"database": "luigi", "user": user, "host": host, "port": port}
+    connection_parms = {
+        "host": host,
+        "port": port,
+        "database": "luigi",
+        "user": user,
+        "password": password,
+    }
     LOGGER.info(
         "Attempting to connect to database with parameters: %s", connection_parms
     )
@@ -204,7 +215,7 @@ def main(
     cc_list: typing.Optional[typing.Iterable[str]] = None,
 ) -> int:
     """Main execution of logic"""
-    task_events, task_parms, tasks = query_task_history(user)
+    task_events, task_parms, tasks = query_task_history(user=user)
 
     task_master = create_master_task_history(
         task_events,
